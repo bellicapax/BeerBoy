@@ -1,0 +1,44 @@
+3.158224
+
+if(longTent0)3,4
+{
+ can't do:
+	smallTent0, 1
+		1,4,
+
+}
+
+if(longTent1)5,6
+{
+ can't do:
+	smallTent2, 3, 4
+		5,10
+}
+
+if(longTent2)7,8
+{
+ can't do:
+	smallTent5, 6, 7
+		11,16
+}
+
+if(longTent3)9,10
+{
+ can't do:
+	smalltent7, 8, 9
+		15,20
+}
+
+if(longTent4)11,12
+{
+ can't do:
+	smallTent9, 10, 11
+		19,24
+}
+
+if(longTent5)13,14
+{
+ can't do:
+	smallTent11, 12, 13
+		23,28
+}
