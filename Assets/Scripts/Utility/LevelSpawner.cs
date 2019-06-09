@@ -4,8 +4,6 @@ using System.Collections.Generic;
 
 public class LevelSpawner : MonoBehaviour {
 
-    public int startingNumberOfTrashCans = 10;
-    public int maxNumberOfTrashCans = 25;
 
     public GameObject goTile1;
     public GameObject goFirstTile1;
@@ -34,19 +32,26 @@ public class LevelSpawner : MonoBehaviour {
     // More global variables
     public Transform tileTransform;
     private int tileCounter = 1;
+    private int numberOfTrashPositionItemsToSpawn;
     private Vector3 offScreen = new Vector3(0.0f, -1000.0f, 0.0f);
     private Vector3 nextTilePlus = new Vector3(0.0f, 0.0f, 208.6048f);
+    private PlayerInput scriptInput;
 
     // Variables for spawning trash cans
+    private int startingNumberOfTrashCans = 5;
     private int trashCanNumberWide = 9;
-    private int trashCanNumberDeep = 65;
-    private float minimumTrashCanDistance = 5.0f;
+    private int trashCanNumberDeep = 63;            // was 65
+    private int minimumTrashCanDistance = 5;
+    private int baseNumberOfItemsPerSquare;
+    private int numberOfSquaresWithOneAdditionalItem;
     private float trashCanSpacing = 3.158224f;
-    public List<Vector2> originalTrashCanPositions = new List<Vector2>();
+    public List<Vector2> trashCanReferences = new List<Vector2>();
     private List<Vector2> usedTrashCanPositions = new List<Vector2>();
     public List<Vector2> remainingTrashCanPositions = new List<Vector2>();
     private Vector3 playerStartingPosition;
-    private Vector3 trashCanZminXmin = new Vector3(15.09241f, 0.008809675f, 102.6423f);
+    //private Vector3 trashCanZminXmin = new Vector3(15.09241f, 0.008809675f, 102.6423f);
+    private Vector3 trashCanZminXmin = new Vector3(15.09241f, 0.008809675f, 105.800524f);
+
     public Vector3[,] trashCanPositions;
  
     // Variables for spawning small items
@@ -54,9 +59,20 @@ public class LevelSpawner : MonoBehaviour {
     private List<int> currentSmallItemsList;
     private List<int> currentlongTentList = new List<int>();
 
+    // Variables for spawning party goers
+    public GameObject goGirl;
+    public GameObject goDude;
+    private int startingNumberOfPartyGoers = 1;
+
+    // Variables for spawning beer and soda
+    public GameObject goBeer;
+    public GameObject goSoda;
+
 	// Use this for initialization
 	void Start () 
     {
+        scriptInput = GameObject.FindWithTag("Player").GetComponent<PlayerInput>();
+
         // *** Initialize the longTent and smallTent arrays ***
 
         longTentPositions = new Vector3[goLongTentTransforms.GetComponentsInChildren<Transform>().Length];
@@ -109,17 +125,27 @@ public class LevelSpawner : MonoBehaviour {
             for (int j = 0; j < trashCanNumberDeep; j++)
             {
                 trashCanPositions[i, j] = new Vector3(trashCanZminXmin.x - (i * trashCanSpacing), trashCanZminXmin.y, trashCanZminXmin.z - (j * trashCanSpacing));
-                originalTrashCanPositions.Add(new Vector2(i, j));
+                trashCanReferences.Add(new Vector2(i, j));
             }
         }
 
-        foreach (Vector2 v in originalTrashCanPositions)
+        foreach (Vector2 v in trashCanReferences)
         {
             remainingTrashCanPositions.Add(v);
         }
 
         // *** Instantiate the original tile scenery ***
-        SpawnTrashCans(goFirstTile1.transform, true);
+        //minimumTrashCanDistance = (startingNumberOfPartyGoers * 2.0f * tileCounter) + (NumOfBeerAndSoda() * 2.0f * tileCounter) + startingNumberOfTrashCans;
+
+        //SpawnGoAtTrashPositions(goFirstTile1.transform, goTrashCan, startingNumberOfTrashCans, true, true);
+
+        //SpawnGoAtTrashPositions(goFirstTile1.transform, goGirl, startingNumberOfPartyGoers, true);
+
+        //SpawnGoAtTrashPositions(goFirstTile1.transform, goDude, startingNumberOfPartyGoers, true);
+
+        //SpawnGoAtTrashPositions(tileTransform, goBeer, NumOfBeerAndSoda(), true);
+
+        //SpawnGoAtTrashPositions(tileTransform, goSoda, NumOfBeerAndSoda(), true);
 
         SpawnBeginningEndingTables(goFirstTile1.transform);
 
@@ -128,50 +154,113 @@ public class LevelSpawner : MonoBehaviour {
         RemoveBlockedAreasForSmallItems();
 
         SpawnSmallItems(goFirstTile1.transform);
+
+        StartCoroutine(CreateNextTile());
 	}
 
-    public bool CheckTrashCanPositions(Vector2 possiblePosition, bool startOfTheGame = false)
+    public bool CheckTrashCanPositions(Vector2 possiblePosition)
     {
         foreach (Vector2 v in usedTrashCanPositions)
         {
-            if (Mathf.Abs((possiblePosition.x + possiblePosition.y) - (v.x + v.y)) <= minimumTrashCanDistance)     // If the x + z value of the trash can is less than the minimum distance away, try again
+            if ((Mathf.Abs(possiblePosition.x - v.x) + Mathf.Abs(possiblePosition.y - v.y)) < minimumTrashCanDistance)     // If the x + z value of the object is less than the minimum distance away, try again
                 return true;
-        }
-
-        // For spawning trash cans at the start of the game
-        // Make sure the trash can is at least two spacings away from the player's starting position
-        if (startOfTheGame)
-        {
-            float distance = Vector2.Distance(new Vector2(trashCanPositions[(int)possiblePosition.x, (int)possiblePosition.y].x, trashCanPositions[(int)possiblePosition.x, (int)possiblePosition.y].z), new Vector2(playerStartingPosition.x, playerStartingPosition.z));
-            if (distance < (trashCanSpacing * 2.0f))
-            {
-                return true;
-            }
         }
         return false;
     }
 
-    private void SpawnTrashCans(Transform currentTile, bool firstTime = false)
+    private void RemovePositionsAroundObject(Vector2 position)
     {
-        usedTrashCanPositions.Clear();
-        remainingTrashCanPositions.Clear();
-        foreach (Vector2 v in originalTrashCanPositions)
+        for (int i = 0; i < minimumTrashCanDistance; i++)
         {
-            remainingTrashCanPositions.Add(v);
-        }
-        for (int i = 0; i < startingNumberOfTrashCans; i++)
-        {
-            GameObject trashCanClone = GameObject.Instantiate(goTrashCan, offScreen, Quaternion.identity) as GameObject;                                                    // Instantiate the object
-            trashCanClone.transform.parent =  currentTile;                                                                                                                  // Make it a child of the tile
-            int listPosition = Random.Range(0, remainingTrashCanPositions.Count - 1);                                                                                       // Create a random position in the remaining positions
-            while (CheckTrashCanPositions(remainingTrashCanPositions[listPosition], firstTime))                                                                             // This will return true if they are too close to each other or the player
+            //  To keep j from staying at 15 every time, we subtract the i and only let it get down to k
+            int k = -1;
+            for (int j = minimumTrashCanDistance; j > k; j--)
             {
-                listPosition = Random.Range(0, remainingTrashCanPositions.Count - 1);                                                                                       // If it is, make another and try again
+                // For every position in a diamond shape around the object, remove it.  Subtracting i from j in the y position allows us to keep the diamond shape and not a square
+                if (remainingTrashCanPositions.Contains(new Vector2(position.x + i, position.y + j - i)))
+                {
+                    print("Removing Vector " + new Vector2(position.x + i, position.y + j - i));
+                    remainingTrashCanPositions.Remove(new Vector2(position.x + i, position.y + j - i));
+                }
+                if (remainingTrashCanPositions.Contains(new Vector2(position.x - i, position.y - j + i)))
+                {
+                    print("Removing Vector " + new Vector2(position.x - i, position.y - j + i));
+                    remainingTrashCanPositions.Remove(new Vector2(position.x - i, position.y - j + i));
+                }
             }
-            usedTrashCanPositions.Add(remainingTrashCanPositions[listPosition]);                                                                                                            // Add the unique position to the list
-            trashCanClone.transform.localPosition = trashCanPositions[(int)remainingTrashCanPositions[listPosition].x, (int)remainingTrashCanPositions[listPosition].y];    // Set the clone's local position to that position
-            remainingTrashCanPositions.RemoveAt(listPosition);                                                                                                              // Remove the position from the available positions
+            k++;
         }
+    }
+
+    private void SpawnGoAtTrashPositions(Transform currentTile, GameObject goToClone, int numberToClone, bool trashCans = false)
+    {
+        // Since trash cans are the starting item, clear the used list and repopulate the unused list
+        if (trashCans)
+        {
+            usedTrashCanPositions.Clear();
+            remainingTrashCanPositions.Clear();
+            foreach (Vector2 v in trashCanReferences)
+            {
+                remainingTrashCanPositions.Add(v);
+            }
+        }
+        for (int i = 0; i < numberToClone; i++)
+        {
+            if (remainingTrashCanPositions.Count > 0)                                                                                                                   // Make sure we can spawn more stuff
+            {
+                GameObject goClone = GameObject.Instantiate(goToClone, offScreen, goToClone.transform.rotation) as GameObject;                                                    // Instantiate the object
+                goClone.transform.parent = currentTile;                                                                                                                  // Make it a child of the tile
+                int listPosition = Random.Range(0, remainingTrashCanPositions.Count - 1);                                                                                 // Create a random position in the remaining positions
+                //if (numberOfTrashPositionItemsToSpawn < 146)
+                //{
+                //    while (CheckTrashCanPositions(remainingTrashCanPositions[listPosition]))                                                                             // This will return true if they are too close to each other or the player
+                //    {
+                //        listPosition = Random.Range(0, remainingTrashCanPositions.Count - 1);                                                                                       // If it is, make another and try again
+                //    }
+                //}
+                //RemovePositionsAroundObject(remainingTrashCanPositions[listPosition]);
+                usedTrashCanPositions.Add(remainingTrashCanPositions[listPosition]);                                                                                                            // Add the unique position to the list
+                goClone.transform.localPosition = trashCanPositions[(int)remainingTrashCanPositions[listPosition].x, (int)remainingTrashCanPositions[listPosition].y];    // Set the clone's local position to that position
+                remainingTrashCanPositions.RemoveAt(listPosition);                                                                                                              // Remove the position from the available positions
+            }
+        }
+    }
+
+    private int NumOfBeerAndSoda()
+    {
+        int num = Mathf.CeilToInt((startingNumberOfPartyGoers + tileCounter) / 6.0f);
+        print("Number Of Beers and Soda: " + num);
+            return num;
+    }
+
+    private void ReadyTrashCanNumbers()
+    {
+        numberOfTrashPositionItemsToSpawn = ((startingNumberOfPartyGoers + tileCounter) * 2) + (NumOfBeerAndSoda() * 2) + startingNumberOfTrashCans;
+
+        //baseNumberOfItemsPerSquare = Mathf.FloorToInt(numberOfTrashPositionItemsToSpawn / trashCanNumberWide);
+
+        //numberOfSquaresWithOneAdditionalItem = numberOfTrashPositionItemsToSpawn % trashCanNumberWide;
+
+
+        //float zDistance;
+        //if (65 / numberOfTrashPositionItemsToSpawn > 1)
+        //    zDistance = Mathf.Floor(65 / numberOfTrashPositionItemsToSpawn);
+        //else
+        //    zDistance = 65 / numberOfTrashPositionItemsToSpawn;
+
+        //if (zDistance > 1)
+        //{
+        //    minimumTrashCanDistance = (int)(zDistance + 4);
+        //}
+        //else
+        //{
+        //    minimumTrashCanDistance = Mathf.FloorToInt(4 * zDistance);
+        //}
+    }
+
+    private void CalculateTrashCanDistance(int numberOfItems)
+    {
+        minimumTrashCanDistance = Mathf.FloorToInt(trashCanNumberWide / numberOfItems);
     }
 
     private void SpawnBeginningEndingTables(Transform currentTile)
@@ -339,45 +428,70 @@ public class LevelSpawner : MonoBehaviour {
 
     public IEnumerator CreateNextTile()
     {
-            GameObject tileClone = GameObject.Instantiate(goTile1, nextTilePlus * tileCounter, goTile1.transform.rotation) as GameObject;
-            tileTransform = tileClone.transform;
-            yield return null;
+        GameObject tileClone = GameObject.Instantiate(goTile1, nextTilePlus * tileCounter, goTile1.transform.rotation) as GameObject;
+        tileTransform = tileClone.transform;
+        yield return null;
+
+        ReadyTrashCanNumbers();
+        //print("Minimum Distance = " + minimumTrashCanDistance);
+        //print("Number of items to spawn = " + numberOfTrashPositionItemsToSpawn);
+
+        // Spawn Trash Cans    
+
+        SpawnGoAtTrashPositions(tileTransform, goTrashCan, startingNumberOfTrashCans, true);
+        yield return null;
+
+        // Spawn Kids
+
+        SpawnGoAtTrashPositions(tileTransform, goGirl, startingNumberOfPartyGoers + tileCounter);
+        yield return null;
+
+        // Spawn Adults
+
+        SpawnGoAtTrashPositions(tileTransform, goDude, startingNumberOfPartyGoers + tileCounter);
+        yield return null;
+
             
-            // Spawn Trash Cans    
+        // Spawn Beer
 
-            SpawnTrashCans(tileTransform);
-            yield return null;
-
-            
-            // Create Beginning and Ending Tables
-
-            SpawnBeginningEndingTables(tileTransform);
-            yield return null;
+        SpawnGoAtTrashPositions(tileTransform, goBeer, NumOfBeerAndSoda());
+        yield return null;
 
 
-            // Spawn long tents
+        // Spawn Soda
 
-            SpawnLongTents(tileTransform);
-            yield return null;
-
-
-            // Determine where small objects can spawn
-
-            RemoveBlockedAreasForSmallItems();
-            yield return null;
+        SpawnGoAtTrashPositions(tileTransform, goSoda, NumOfBeerAndSoda());
+        yield return null;
 
 
-            // Determine how many will spawn, where they will spawn, and spawn them
+        // Create Beginning and Ending Tables
 
-            SpawnSmallItems(tileTransform);
+        SpawnBeginningEndingTables(tileTransform);
+        yield return null;
 
 
-            // Create PartyGoers
+        // Spawn long tents
 
-            //yield return new WaitForSeconds(secondsTillNextTile - Time.time);
-            //secondsTillNextTile = Time.time + secondsToCreateNextTile;
-            tileCounter++;
+        SpawnLongTents(tileTransform);
+        yield return null;
+
+
+        // Determine where small objects can spawn
+
+        RemoveBlockedAreasForSmallItems();
+        yield return null;
+
+
+        // Determine how many will spawn, where they will spawn, and spawn them
+
+        SpawnSmallItems(tileTransform);
+
+
+        // Create PartyGoers
+
+        //yield return new WaitForSeconds(secondsTillNextTile - Time.time);
+        //secondsTillNextTile = Time.time + secondsToCreateNextTile;
+        tileCounter++;
     }
-
 
 }

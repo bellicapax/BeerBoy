@@ -18,14 +18,15 @@ public class PlayerInput : MonoBehaviour {
 
     public GameObject goBeer;
     public GameObject goSoda;
-    public GameObject goTest;
 
     public AudioClip[] playersounds;
 
     public int ammoBeer = 6;
     public int ammoSoda = 6;
+    public int penaltyPlayerHitsPartyer = 1;
 
     private bool touchingGround = false;
+    private bool inputtingMovement = false;
 
     // Labels for input axes
     private string vertical = "Vertical";
@@ -39,11 +40,18 @@ public class PlayerInput : MonoBehaviour {
     private float backwardMoveSpeed;
     private float originalForwardSpeed;
     private float slowdownDecrement;
+    private float screenBuffer = 10.0f;
+    private float minInput = 0.1f;
+
 
 
     private Vector3 moveByThis;     // Amount to move each frame
     private Vector3 dirToMouse;     // Vector direction between player and mouse position
     private Vector3 xyForward;      // The player's forward direction in XY screen space
+    private Vector3 cameraUp;
+    private Vector3 cameraRight;
+    private Vector3 offScreen = new Vector3(0.0f, -1000.0f, 0.0f);
+
 
     private Transform myTransform;
     private CharacterController myController;
@@ -62,11 +70,17 @@ public class PlayerInput : MonoBehaviour {
         originalForwardSpeed = forwardMoveSpeed;
         backwardMoveSpeed = forwardMoveSpeed + (scrollSpeed/2);
         slowdownDecrement = forwardMoveSpeed * slowdownPercentage;
+
+        cameraUp = myTransform.InverseTransformDirection(Camera.main.transform.up);
+        cameraUp *= scrollSpeed;
+        cameraRight = myTransform.InverseTransformDirection(Camera.main.transform.right);
+        cameraRight *= scrollSpeed;
 	}
 	
 	// Update is called once per frame
 	void Update () 
     {
+        inputtingMovement = false;
         EndlessMovement();
         EightWayMovement();
         ThrowBeer();
@@ -77,22 +91,25 @@ public class PlayerInput : MonoBehaviour {
 
     private void EndlessMovement()
     {
-        moveByThis = new Vector3(0.0f, 0.0f, scrollSpeed * Time.deltaTime);                      // Reset the Vector3 to scrolling speed
+        moveByThis = Vector3.forward * scrollSpeed * Time.deltaTime;                      // Reset the Vector3 to scrolling speed
     }
 
     private void EightWayMovement()
     {
-        if (Input.GetAxis(vertical) > 0)
+        if (Input.GetAxis(vertical) > minInput)
         {
             moveByThis.z += Input.GetAxis(vertical) * forwardMoveSpeed * Time.deltaTime;
+            inputtingMovement = true;
         }
-        else if(Input.GetAxis(vertical) < 0)
+        else if(Input.GetAxis(vertical) < -minInput)
         {
             moveByThis.z += Input.GetAxis(vertical) * backwardMoveSpeed * Time.deltaTime;
+            inputtingMovement = true;
         }
         if (Input.GetAxis(horizontal) != 0)
         {
             moveByThis.x += Input.GetAxis(horizontal) * forwardMoveSpeed * Time.deltaTime;
+            inputtingMovement = true;
         }
     }
 
@@ -149,12 +166,12 @@ public class PlayerInput : MonoBehaviour {
         {
             if (mouseXPos >= 0)                                                                                                         // If x is positive, then we are to the right or east
             {
-                cloneProjectile = GameObject.Instantiate(goProjectile, beerNE.position, Quaternion.identity) as GameObject;
+                cloneProjectile = GameObject.Instantiate(goProjectile, beerNE.position, goProjectile.transform.rotation) as GameObject;
                 //print("North East"); // DBGR
             }
             else                                                                                                                        // Else x is negative and we are to the left or west
             {
-                cloneProjectile = GameObject.Instantiate(goProjectile, beerNW.position, Quaternion.identity) as GameObject;
+                cloneProjectile = GameObject.Instantiate(goProjectile, beerNW.position, goProjectile.transform.rotation) as GameObject;
                 //print("North West"); // DBGR
             }
         }
@@ -162,12 +179,12 @@ public class PlayerInput : MonoBehaviour {
         {
             if (mouseXPos >= 0)                                                                                                         // If x is positive, then we are to the right or east
             {
-                cloneProjectile = GameObject.Instantiate(goProjectile, beerSE.position, Quaternion.identity) as GameObject;
+                cloneProjectile = GameObject.Instantiate(goProjectile, beerSE.position, goProjectile.transform.rotation) as GameObject;
                 //print("South East"); // DBGR
             }
             else                                                                                                                        // Else x is negative and we are to the left or west
             {
-                cloneProjectile = GameObject.Instantiate(goProjectile, beerSW.position, Quaternion.identity) as GameObject;
+                cloneProjectile = GameObject.Instantiate(goProjectile, beerSW.position, goProjectile.transform.rotation) as GameObject;
                 //print("South West"); // DBGR
             }
         }
@@ -193,15 +210,40 @@ public class PlayerInput : MonoBehaviour {
 
     private void ApplyMovement()
     {
-        float testX = Camera.main.WorldToScreenPoint(myTransform.position + moveByThis).x;
-        float testY = Camera.main.WorldToScreenPoint(myTransform.position + moveByThis).y;
-
-        if (testX >= Screen.width || testX <= 0.0f || testY >= Screen.height || testY <= 0.0f)
+        if(inputtingMovement)
         {
-            moveByThis = new Vector3(0.0f, 0.0f, scrollSpeed * Time.deltaTime);                      // Reset the Vector3 to scrolling speed
+            float testX = Camera.main.WorldToScreenPoint(myTransform.position).x;
+            float testY = Camera.main.WorldToScreenPoint(myTransform.position).y;
+
+            //print("X: " + Camera.main.WorldToScreenPoint(myTransform.position).x + " Y: " + Camera.main.WorldToScreenPoint(myTransform.position).y);
+
+            if (WeAreTryingToGoOffscreen(testX, testY))
+            {
+                moveByThis = (Vector3.forward * scrollSpeed * Time.deltaTime);
+            }
         }
-            //myTransform.Translate(myTransform.InverseTransformDirection( moveByThis));
         myController.Move(moveByThis);
+    }
+
+    bool WeAreTryingToGoOffscreen(float x, float y)
+    {
+        if (x + screenBuffer >= Screen.width && (Input.GetAxis(horizontal) > minInput || Input.GetAxis(vertical) > minInput))
+        {
+            return true;
+        }
+        else if (x - screenBuffer <= minInput && (Input.GetAxis(horizontal) < -minInput || Input.GetAxis(vertical) < -minInput))
+        {
+            return true;
+        }
+        else if (y + screenBuffer >= Screen.height && (Input.GetAxis(horizontal) < -minInput || Input.GetAxis(vertical) > minInput))
+        {
+            return true;
+        }
+        else if (y - screenBuffer <= minInput && (Input.GetAxis(horizontal) > minInput || Input.GetAxis(vertical) < -minInput))
+        {
+            return true;                     
+        }
+        return false;
     }
 
     void OnTriggerEnter(Collider other)
@@ -216,19 +258,11 @@ public class PlayerInput : MonoBehaviour {
         }
         else if (other.tag == "AmmoBeer")
         {
-            PlaySound(playersounds[1], Random.Range(0.5f, 1.5f));
-            ammoBeer += 6;
-            GameObject.Destroy(other.gameObject);
+            AmmoBeerCollision(other.gameObject);
         }
         else if (other.tag == "AmmoSoda")
         {
-            PlaySound(playersounds[1], Random.Range(0.5f, 1.5f));
-            ammoSoda += 6;
-            GameObject.Destroy(other.gameObject);
-        }
-        else if (other.tag == adultWantsBeer || other.tag == childWantsSoda)
-        {
-            StartCoroutine(SlowPlayer());
+            AmmoSodaCollision(other.gameObject);
         }
     }
 
@@ -240,28 +274,46 @@ public class PlayerInput : MonoBehaviour {
         }
     }
 
-    private IEnumerator SlowPlayer()
+    //public IEnumerator SlowPlayer()
+    //{
+    //    PlaySound(playersounds[0], 1.0f);
+    //    if (forwardMoveSpeed > forwardMoveSpeed * 0.2)
+    //    {
+    //        forwardMoveSpeed -= slowdownDecrement;
+    //        if (forwardMoveSpeed > 0)
+    //            backwardMoveSpeed = forwardMoveSpeed + (scrollSpeed / 2);
+    //        else
+    //            backwardMoveSpeed = 0;
+    //    }
+
+    //    yield return new WaitForSeconds(slowdownDuration);
+
+    //    if (forwardMoveSpeed + slowdownDecrement < originalForwardSpeed)
+    //    {
+    //        forwardMoveSpeed += slowdownDecrement;
+    //        backwardMoveSpeed = forwardMoveSpeed + (scrollSpeed / 2);
+    //    }
+    //}
+
+    public void AmmoBeerCollision(GameObject other)
     {
-        PlaySound(playersounds[0], 1.0f);
-        if (forwardMoveSpeed > forwardMoveSpeed * 0.2)
-        {
-            forwardMoveSpeed -= slowdownDecrement;
-            if (forwardMoveSpeed > 0)
-                backwardMoveSpeed = forwardMoveSpeed + (scrollSpeed / 2);
-            else
-                backwardMoveSpeed = 0;
-        }
-
-        yield return new WaitForSeconds(slowdownDuration);
-
-        forwardMoveSpeed += slowdownDecrement;
-        backwardMoveSpeed = forwardMoveSpeed + (scrollSpeed / 2);
+        PlaySound(1, Random.Range(0.5f, 1.5f));
+        ammoBeer += 6;
+        GameObject.Destroy(other.transform.parent.gameObject);
     }
 
-    private void PlaySound(AudioClip clipToPlay, float pitch)
+    public void AmmoSodaCollision(GameObject other)
     {
-        myAudioSource.clip = clipToPlay;
+        PlaySound(1, Random.Range(0.5f, 1.5f));
+        ammoSoda += 6;
+        GameObject.Destroy(other.transform.parent.gameObject);
+    }
+
+    public void PlaySound(int clipToPlay, float pitch)
+    {
+        myAudioSource.clip = playersounds[clipToPlay];
         myAudioSource.pitch = pitch;
         myAudioSource.Play();
     }
+
 }

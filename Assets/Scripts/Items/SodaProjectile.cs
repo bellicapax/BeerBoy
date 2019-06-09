@@ -7,8 +7,8 @@ public class SodaProjectile : MonoBehaviour {
     public float moveSpeed = 25.0f;
     public float rotationsPerSecond = 2.0f;
     public GameObject bubbles;
+    public bool reachedTarget = false;
 
-    private bool reachedTarget = false;
     private float angle;
     private float scrollSpeed;
     private float distance;
@@ -18,6 +18,7 @@ public class SodaProjectile : MonoBehaviour {
     private string adultWantsBeer = "AdultWantsBeer";
     private string childWantsSoda = "ChildWantsSoda";
     private string player = "Player";
+    private string playerCollider = "PlayerCollider";
     private string spawn = "Spawn";
     private Vector3 direction;
     private Transform myTransform;
@@ -41,7 +42,7 @@ public class SodaProjectile : MonoBehaviour {
         arcHeight = target.y * 2.0f;
         direction = (target - myTransform.position).normalized;
 
-        myTransform.rotation = Quaternion.LookRotation(direction);          // Face towards where we are throwing
+        //myTransform.rotation = Quaternion.LookRotation(direction);          // Face towards where we are throwing
 
         //angle = Mathf.Atan2(direction.z, direction.x);                                                                                  // Get the angle of the direction to the target.  This is what we need the addition of our two vectors to match
         //direction = new Vector3(moveSpeed * Mathf.Cos(angle), 0.0f, moveSpeed * Mathf.Sin(angle) - scrollSpeed).normalized;                        // Find the new direction that equals the angle and includes the scroll speed.
@@ -52,7 +53,7 @@ public class SodaProjectile : MonoBehaviour {
         OffscreenDestroy();
         if (!reachedTarget)
         {
-            myTransform.Rotate(new Vector3(rotationsPerSecond * 6.0f, 0.0f, 0.0f));
+            myTransform.RotateAround(myTransform.position, myTransform.forward, rotationsPerSecond * -6.0f);
             myTransform.Translate(myTransform.InverseTransformDirection(direction * moveSpeed * Time.deltaTime));
             myTransform.YPosition((arcHeight * (Mathf.Sin(((Mathf.PI / oneAndOneFifthDistance) * xEquation) + (Mathf.PI/6.0f)))));      // y = arcHeight * sin((PI/distance * 1.2f) * x  + (PI/6.0f))  This ensures that we start 3/4 of the way up the ascent and land on the ground before it smoothes out in the descent.` 
             xEquation += moveSpeed * Time.deltaTime;
@@ -66,76 +67,50 @@ public class SodaProjectile : MonoBehaviour {
             GameObject.Destroy(this.gameObject);
     }
 
-    //void LandAtTarget()
-    //{
-    //    print("Y: " + myTransform.position.y);
-    //    //if (PlusOrMinus(myTransform.position.x.Round(1), target.x.Round(1), 1, 4) && PlusOrMinus(myTransform.position.z.Round(1), target.z.Round(1), 1, 4))
-    //    if(myTransform.position.y <= 0.2)
-    //    {
-    //        // Change animation to broken bottle
-
-    //        // Spawn bubbles
-    //        GameObject bubbleClone = GameObject.Instantiate(bubbles, myTransform.position, Quaternion.identity) as GameObject;
-
-    //        // Play breaking sound
-    //        myAudioSource.pitch = Random.Range(0.75f, 1.25f);
-    //        myAudioSource.Play();
-
-    //        // Stop movement
-    //        reachedTarget = true;
-    //    }
-
-    //}
-
-    //bool PlusOrMinus(float flt1, float flt2, int numOfDigits, int variance)
-    //{
-    //    if (flt1 == flt2)
-    //    {
-    //        return true;
-    //    }
-    //    else
-    //    {
-    //        print("Difference: " + Mathf.Abs(flt2 - flt1));
-    //        float allowedVariance = variance / (Mathf.Pow(10.0f, (float)numOfDigits));
-    //        print("AllowedVariance " + allowedVariance);
-    //        if (Mathf.Abs(flt2 - flt1) <= allowedVariance)
-    //            return true;
-    //        else
-    //            return false;
-    //    }
-    //}
-
     void OnTriggerEnter(Collider other)
     {
-        if (other.tag == adultWantsBeer)
+        if (!reachedTarget)
         {
-            Scorekeeper.playerScore--;
-            //print(Scorekeeper.playerScore);           // DBGR
-            GameObject.Destroy(this.gameObject);
-        }
-        else if (other.tag == childWantsSoda)
-        {
-            Scorekeeper.playerScore++;
-            //print(Scorekeeper.playerScore);            // DBGR
-            GameObject.Destroy(this.gameObject);
-        }
-        else if (other.tag != player && other.tag != spawn)
-        {
-            // Let the bottle fall to the ground
-            myCollider.isTrigger = false;
-            myRigidbody.useGravity = true;
+            if (other.tag == adultWantsBeer)
+            {
+                Scorekeeper.popularityMeter -= Scorekeeper.penaltyAdultGetsSoda;
+                Scorekeeper.currentStreak = 0;
+                //print(Scorekeeper.popularityMeter);           // DBGR
+                GameObject.Destroy(this.gameObject);
+            }
+            else if (other.tag == childWantsSoda)
+            {
+                Scorekeeper.popularityMeter += Scorekeeper.rewardChildGetsSoda * Scorekeeper.comboMultiplier;
+                Scorekeeper.currentStreak++;
+                //print(Scorekeeper.popularityMeter);            // DBGR
+                GameObject.Destroy(this.gameObject);
+            }
+            else if (other.tag == "Police")
+            {
+                GameObject.Destroy(this.gameObject);
+            }
 
-            // Change animation to broken bottle
+            else if (other.tag != player && other.tag != spawn && other.tag != playerCollider)
+            {
+                // Combo is over
+                Scorekeeper.currentStreak = 0;
 
-            // Spawn bubbles
-            GameObject bubbleClone = GameObject.Instantiate(bubbles, myTransform.position, bubbles.transform.rotation) as GameObject;
+                // Let the bottle fall to the ground
+                myCollider.isTrigger = false;
+                myRigidbody.useGravity = true;
 
-            // Play breaking sound
-            myAudioSource.pitch = Random.Range(0.75f, 1.25f);
-            myAudioSource.Play();
+                // Change animation to broken bottle
 
-            // Stop movement
-            reachedTarget = true;
+                // Spawn bubbles
+                GameObject bubbleClone = GameObject.Instantiate(bubbles, myTransform.position, bubbles.transform.rotation) as GameObject;
+
+                // Play breaking sound
+                myAudioSource.pitch = Random.Range(0.75f, 1.25f);
+                myAudioSource.Play();
+
+                // Stop movement
+                reachedTarget = true;
+            }
         }
     }
 

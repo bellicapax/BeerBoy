@@ -1,0 +1,21 @@
+If you give an adult beer, you gain on the refreshometer
+
+If you give an adult soda, you lose a little
+
+If you fail to give the adult anything, you lose on the refreshometer
+
+
+If you give a kid soda, you gain on the refreshometer
+
+If you give a kid beer, you lose big on the refreshometer
+
+If you fail to give the kid anything, you lose on the refreshometer
+
+
+Bonus gains for streaks of successful
+
+	missing breaks the streak
+
+	and giving the wrong item breaks the streak
+
+650 x 490

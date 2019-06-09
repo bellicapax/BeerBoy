@@ -17,7 +17,7 @@ public class CameraMovement : MonoBehaviour {
         goPlayer = GameObject.FindWithTag("Player");
         cameraScrollSpeed = goPlayer.GetComponent<PlayerInput>().scrollSpeed;
         myTransform = this.transform;
-        myTransform.LookAt(goPlayer.transform.position);
+        //myTransform.LookAt(goPlayer.transform.position);
         dirToScroll = myTransform.InverseTransformDirection(Vector3.forward);
 	}
 	
